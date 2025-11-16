@@ -2,6 +2,7 @@ import { program } from 'commander'
 import * as fs from 'fs/promises';
 import express from 'express';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
 program
   .option('-h, --host <type>', 'Server host')
@@ -19,8 +20,19 @@ if (!options.host || !options.port || !options.cache) {
 const app = express();
 const cache_path = path.resolve(options.cache);
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 app.get('/', (_req, res) => {
   res.send('test');
+});
+
+app.get('/RegisterForm.html', (_req, res) => {
+  res.sendFile(path.join(__dirname, 'RegisterForm.html'));
+});
+
+app.get('/SearchForm.html', (_req, res) => {
+  res.sendFile(path.join(__dirname, 'SearchForm.html'));
 });
 
 (async () => {

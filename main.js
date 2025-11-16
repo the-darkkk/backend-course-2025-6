@@ -3,6 +3,7 @@ import * as fs from 'fs/promises';
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import multer from 'multer';
 
 program
   .option('-h, --host <type>', 'Server host')
@@ -19,9 +20,18 @@ if (!options.host || !options.port || !options.cache) {
 
 const app = express();
 const cache_path = path.resolve(options.cache);
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const storage = multer.diskStorage({
+  destination: cache_path,
+  filename: (_req, file, cb) => {
+    const fileExt = path.extname(file.originalname);
+    const newName = Date.now() + fileExt; 
+    cb(null, newName);
+  }
+});
+const upload = multer({ storage: storage });
 
 app.get('/', (_req, res) => {
   res.send('test');
@@ -33,6 +43,43 @@ app.get('/RegisterForm.html', (_req, res) => {
 
 app.get('/SearchForm.html', (_req, res) => {
   res.sendFile(path.join(__dirname, 'SearchForm.html'));
+});
+
+app.post('/register', upload.single('photo'), async (req, res) => {
+  try {
+    const { inventory_name, description } = req.body;
+    if (!inventory_name) {
+      return res.status(400).send('Error: "inventory_name" is required.');
+    }
+    let inventory = [];
+    try {
+      const dbData = await fs.readFile(path.join(cache_path, 'db.json'), 'utf8');
+      inventory = JSON.parse(dbData);
+    } catch (err) {
+      if (err.code !== 'ENOENT') throw err; 
+    }
+    
+    const maxId = inventory.reduce((max, item) => Math.max(max, item.id), 0);
+    const newId = maxId + 1;
+    const photoName = req.file ? req.file.filename : null;
+
+    const newItem = {
+      id: newId, 
+      name: inventory_name,
+      description: description || '',
+      photo: photoName 
+    };
+
+    inventory.push(newItem);
+    await fs.writeFile(path.join(cache_path, 'db.json'), JSON.stringify(inventory, null, 2));
+
+    console.log(`Registered item ${newId} with photo ${photoName}`);
+    res.status(201).json(newItem);
+
+  } catch (err) {
+    console.error('Error processing /register request:', err);
+    res.status(500).send('Internal Server Error');
+  }
 });
 
 (async () => {

@@ -35,10 +35,6 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-app.get('/', (_req, res) => {
-  res.send('test');
-});
-
 app.get('/RegisterForm.html', (_req, res) => {
   res.sendFile(path.join(__dirname, 'RegisterForm.html'));
 });
@@ -360,6 +356,18 @@ app.get('/search', async (req, res) => {
     console.error('Error processing /search', err);
     res.status(500).send('Internal Server Error');
   }
+});
+
+app.all('/inventory/:id/photo', (_req, res) => {
+  res.status(405).send('Method Not Allowed');
+});
+
+app.all('/inventory/:id', (_req, res) => {
+  res.status(405).send('Method Not Allowed');
+});
+
+app.all('/inventory', (_req, res) => {
+  res.status(405).send('Method Not Allowed');
 });
 
 (async () => {

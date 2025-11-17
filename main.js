@@ -322,6 +322,46 @@ app.delete('/inventory/:id', async (req, res) => {
   }
 });
 
+app.get('/search', async (req, res) => {
+  try {
+    const { id, includePhoto } = req.query;
+    if (!id) {
+      return res.status(400).send('Search ID is required.');
+    }
+    const requestedId = parseInt(id, 10);
+    if (isNaN(requestedId)) {
+      return res.status(400).send('Invalid ID. Must be a number.');
+    }
+    let inventory;
+    try {
+      const dbData = await fs.readFile(database_path, 'utf8');
+      inventory = JSON.parse(dbData);
+    } catch (dbErr) {
+      if (dbErr.code === 'ENOENT') {
+        return res.status(404).send('Inventory database not found.');
+      }
+      throw dbErr;
+    }
+    const item = inventory.find(i => i.id === requestedId);
+
+    if (!item) {
+      return res.status(404).send(`Item with ID ${requestedId} not found.`);
+    }
+    const { photo, ...rest } = item;
+    const itemResponse = { ...rest }; 
+    const shouldIncludePhoto = (includePhoto === 'on');
+    
+    if (shouldIncludePhoto && photo) {
+      itemResponse.photo_url = `/inventory/${item.id}/photo`;
+    }
+    res.json(itemResponse);
+
+  } catch (err) {
+    console.error('Error processing /search', err);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
 (async () => {
   try {
     await fs.mkdir(cache_path, { recursive: true });

@@ -19,6 +19,7 @@ if (!options.host || !options.port || !options.cache) {
 }
 
 const app = express();
+app.use(express.json());
 const cache_path = path.resolve(options.cache);
 const database_path = path.join(cache_path, 'db.json')
 const __filename = fileURLToPath(import.meta.url);
@@ -187,6 +188,136 @@ app.get('/inventory/:id', async (req, res) => {
     res.json(itemResponse);
   } catch (err) {
     console.error('Error processing /inventory/:id', err);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
+app.put('/inventory/:id', async (req, res) => {
+  try {
+    const requestedId = parseInt(req.params.id, 10);
+    const { name, description } = req.body;
+    if (isNaN(requestedId)) {
+      return res.status(400).send('Invalid ID.');
+    }
+    let inventory;
+    try {
+      const dbData = await fs.readFile(database_path, 'utf8');
+      inventory = JSON.parse(dbData);
+    } catch (dbErr) {
+      if (dbErr.code === 'ENOENT') {
+        return res.status(404).send('Inventory database not found.');
+      }
+      throw dbErr;
+    }
+    const itemIndex = inventory.findIndex(i => i.id === requestedId);
+
+    if (itemIndex === -1) {
+      return res.status(404).send(`Item with ID ${requestedId} not found.`);
+    }
+    const item = inventory[itemIndex];
+    if (name !== undefined) {
+      item.name = name;
+    }
+    if (description !== undefined) {
+      item.description = description;
+    }
+
+    await fs.writeFile(database_path, JSON.stringify(inventory, null, 2));
+    const { photo, ...rest } = item;
+    const responseItem = { ...rest };
+    if (photo) {
+      responseItem.photo_url = `/inventory/${item.id}/photo`;
+    }
+    res.json(responseItem);
+
+  } catch (err) {
+    console.error('Error processing PUT /inventory/:id', err);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
+app.put('/inventory/:id/photo', upload.single('photo'), async (req, res) => {
+  try {
+    const requestedId = parseInt(req.params.id, 10);
+    if (isNaN(requestedId)) {
+      return res.status(400).send('Invalid ID.');
+    }
+    if (!req.file) {
+      return res.status(400).send('No photo file uploaded.');
+    }
+
+    let inventory;
+    try {
+      const dbData = await fs.readFile(database_path, 'utf8');
+      inventory = JSON.parse(dbData);
+    } catch (dbErr) {
+      if (dbErr.code === 'ENOENT') {
+        return res.status(404).send('Inventory database not found.');
+      }
+      throw dbErr;
+    }
+    const itemIndex = inventory.findIndex(i => i.id === requestedId);
+    if (itemIndex === -1) {
+      await fs.unlink(req.file.path); 
+      return res.status(404).send(`Item with ID ${requestedId} not found.`);
+    }
+
+    const oldPhotoName = inventory[itemIndex].photo;
+    if (oldPhotoName) {
+      try {
+        await fs.unlink(path.join(cache_path, oldPhotoName));
+      } catch (unlinkErr) {
+        console.warn(`Could not delete old photo: ${oldPhotoName}`, unlinkErr.message);
+      }
+    }
+    inventory[itemIndex].photo = req.file.filename;
+    await fs.writeFile(database_path, JSON.stringify(inventory, null, 2));
+
+    res.status(200).send('Photo updated successfully.');
+
+  } catch (err) {
+    console.error('Error processing PUT /inventory/:id/photo', err);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
+app.delete('/inventory/:id', async (req, res) => {
+  try {
+    const requestedId = parseInt(req.params.id, 10);
+    if (isNaN(requestedId)) {
+      return res.status(400).send('Invalid ID.');
+    }
+    
+    let inventory;
+    try {
+      const dbData = await fs.readFile(database_path, 'utf8');
+      inventory = JSON.parse(dbData);
+    } catch (dbErr) {
+      if (dbErr.code === 'ENOENT') {
+        return res.status(404).send('Inventory database not found.');
+      }
+      throw dbErr;
+    }
+    const itemIndex = inventory.findIndex(i => i.id === requestedId);
+    if (itemIndex === -1) {
+      return res.status(404).send(`Item with ID ${requestedId} not found.`);
+    }
+    const itemToDelete = inventory[itemIndex];
+    inventory.splice(itemIndex, 1);
+
+    await fs.writeFile(database_path, JSON.stringify(inventory, null, 2));
+    if (itemToDelete.photo) {
+      try {
+        await fs.unlink(path.join(cache_path, itemToDelete.photo));
+      } catch (unlinkErr) {
+        console.warn(`Could not delete photo: ${itemToDelete.photo}`, unlinkErr.message);
+      }
+    }
+
+    res.status(200).send('Item deleted successfully.');
+
+  } catch (err) {
+    console.error('Error processing DELETE /inventory/:id', err);
     res.status(500).send('Internal Server Error');
   }
 });

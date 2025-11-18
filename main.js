@@ -98,12 +98,10 @@ app.post('/register', upload.single('photo'), async (req, res) => {
       id: newId, 
       name: inventory_name,
       description: description || '',
-      photo: photoName 
-    };
+      photo: photoName };
 
     inventory.push(newItem);
     await fs.writeFile(database_path, JSON.stringify(inventory, null, 2));
-
     console.log(`Registered item ${newId} with photo ${photoName}`);
     res.status(201).json(newItem);
 
@@ -146,7 +144,6 @@ app.get('/inventory/:id/photo', async (req, res) => {
 
     const inventory = JSON.parse(dbData);
     const item = inventory.find(i => i.id === requestedId);
-
     if (!item) {
       return res.status(404).send(`Item with ID ${requestedId} not found.`);
     }
@@ -244,7 +241,6 @@ app.get('/inventory/:id', async (req, res) => {
     }
     const inventory = JSON.parse(dbData);
     const item = inventory.find(i => i.id === requestedId);
-
     if (!item) {
       return res.status(404).send(`Item with ID ${requestedId} not found.`);
     }
@@ -313,7 +309,6 @@ app.put('/inventory/:id', async (req, res) => {
       throw dbErr;
     }
     const itemIndex = inventory.findIndex(i => i.id === requestedId);
-
     if (itemIndex === -1) {
       return res.status(404).send(`Item with ID ${requestedId} not found.`);
     }
@@ -379,7 +374,6 @@ app.put('/inventory/:id/photo', upload.single('photo'), async (req, res) => {
     if (!req.file) {
       return res.status(400).send('No photo file uploaded.');
     }
-
     let inventory;
     try {
       const dbData = await fs.readFile(database_path, 'utf8');
@@ -395,7 +389,6 @@ app.put('/inventory/:id/photo', upload.single('photo'), async (req, res) => {
       await fs.unlink(req.file.path); 
       return res.status(404).send(`Item with ID ${requestedId} not found.`);
     }
-
     const oldPhotoName = inventory[itemIndex].photo;
     if (oldPhotoName) {
       try {
@@ -466,7 +459,6 @@ app.delete('/inventory/:id', async (req, res) => {
         console.warn(`Could not delete photo: ${itemToDelete.photo}`, unlinkErr.message);
       }
     }
-
     res.status(200).send('Item deleted successfully.');
 
   } catch (err) {
@@ -522,7 +514,6 @@ app.get('/search', async (req, res) => {
       throw dbErr;
     }
     const item = inventory.find(i => i.id === requestedId);
-
     if (!item) {
       return res.status(404).send(`Item with ID ${requestedId} not found.`);
     }
